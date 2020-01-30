@@ -1,13 +1,43 @@
 import sys
+import math
 import numpy as np
 
 Debug = False
 
-def gini_impurity():
-    pass
+def gini_impurity(dataset):
+    total = len(dataset)
+    count_0, count_1 = 0., 0.
+    value_0 = dataset[0][-1]
 
-def gini_gain():
-    pass
+    for data in dataset:
+        if data[-1] == value_0:
+            count_0 += 1
+        else:
+            count_1 += 1
+
+    return 1 - (count_0 / total) ** 2 - (count_1 / total) ** 2
+
+def gini_gain(dataset, attri_idx):
+    total = len(dataset)
+    count_att0, count_att1 = 0, 0
+    dataset_att0, dataset_att1 = [], []
+    value_0 = dataset[0][-1]
+
+    for data in dataset:
+        if data[attri_idx] == value_0:
+            count_att0 += 1
+            dataset_att0.append(data)
+        else:
+            count_att1 += 1
+            dataset_att1.append(data)
+
+    p_att0 = count_att0 / total
+    p_att1 = count_att1 / total
+    gini_att0 = gini_impurity(dataset_att0)
+    gini_att1 = gini_impurity(dataset_att1)
+    gini_y = gini_impurity(dataset)
+
+    return gini_y - p_att0 * gini_att0 - p_att1 * gini_att1
 
 # return the y value which appears most times
 def majority_vote(dataset):
