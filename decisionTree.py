@@ -3,6 +3,12 @@ import numpy as np
 
 Debug = False
 
+def gini_impurity():
+    pass
+
+def gini_gain():
+    pass
+
 # return the y value which appears most times
 def majority_vote(dataset):
     cnt = dict()
@@ -13,9 +19,17 @@ def majority_vote(dataset):
             cnt[data[-1]] = 1
     return max(cnt, key = lambda x: cnt[x])
 
-class decision_stump(object):
-    def __init__(self, split_idx):
-        self.split_idx = split_idx
+class tree_node(object):
+    def __init__(self, val):
+        self.left = None
+        self.right = None
+        self.val = val
+
+class decision_tree(object):
+    def __init__(self, max_depth):
+        self.root = None
+        self.depth = 0
+        self.max_depth = max_depth
 
     def train(self, train_file):
         self.value_left = None
@@ -72,15 +86,20 @@ class decision_stump(object):
 
         return error / (total - 1) # len(data)
 
+    def print_tree(self):
+        print("TODO\n")
+        pass
+
+
 if __name__ == '__main__':
     train_file = sys.argv[1]  # path to the training input .tsv file
     test_file = sys.argv[2] # path to the test input .tsv file
-    split_idx = int(sys.argv[3])  # the index of feature at which we split the dataset. start from 0
+    max_depth = int(sys.argv[3])  # maximum depth to which the tree should be built
     train_out = sys.argv[4] # path of output .labels file to the predictions on the training data
     test_out = sys.argv[5]  # path of output .labels file to the predictions on the testing data
     metrics_out = sys.argv[6] # path of the output .txt file to metrics such as train and test error
 
-    model = decision_stump(split_idx)
+    model = decision_tree(max_depth)
 
     # training: build the model
     model.train(train_file)
@@ -93,6 +112,11 @@ if __name__ == '__main__':
         print("train_error: ", train_error)
         print("test_error: ", test_error)
 
+    # Output: Metrics File
     with open(metrics_out, 'w') as f_metrics:
         f_metrics.write("error(train): " + str(train_error) + "\n")
         f_metrics.write("error(test): " + str(test_error))
+
+    # Output: Printing the Tree
+    # Note: another way is to print it during tree generation
+    model.print_tree()
