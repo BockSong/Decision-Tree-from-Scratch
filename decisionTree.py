@@ -28,9 +28,9 @@ def gini_impurity(dataset):
             count_1 += 1
 
     gini = 1 - (count_0 / total) ** 2 - (count_1 / total) ** 2
-    label_count = [value_0, count_0, value_1, count_1]
+    label = {value_0: int(count_0), value_1: int(count_1)}
 
-    return gini, label_count
+    return gini, label
 
 def gini_gain(dataset, attri_idx):
     total = len(dataset)
@@ -86,8 +86,9 @@ class decision_tree(object):
         self.depth = 0
         self.max_depth = max_depth
         self.unused_nodes = None
-        # The following attris are for printing tree
+        # The following attributes are for printing tree
         self.attriName = None
+        self.labelName = set()
 
     def build_tree(self, train_file):
         dataset = []
@@ -101,6 +102,8 @@ class decision_tree(object):
                     self.attriName = split_line
                 else:
                     dataset.append(split_line)
+                    if split_line[-1] not in self.labelName:
+                        self.labelName.add(split_line[-1])
                 idx += 1
 
         # len(0, 1, 2, 3, 4) = 5
@@ -110,8 +113,9 @@ class decision_tree(object):
     def train_stump(self, dataset):
         # special stopping rules
         pred = majority_vote(dataset)
+        _, label = gini_impurity(dataset)
         if (len(self.unused_nodes) == 0) and (self.depth >= self.max_depth):
-            return tree_node(pred, True)
+            return self.make_leaf(pred, label)
 
         gg_max, split_idx = 0, -1
         dataset_0, dataset_1 = None, None
@@ -150,7 +154,13 @@ class decision_tree(object):
             return node
         else:
             # touch stoping rule, no split
-            return tree_node(pred, True)
+            return self.make_leaf(pred, label)
+
+    # return a new leaf with given label info (for printing)
+    def make_leaf(self, pred, label):
+        newleaf = tree_node(pred, True)
+        newleaf.split_info = {"label": label}
+        return newleaf
 
     # Use decision tree to predict y for a single data line
     def predict(self, node, ele):
@@ -189,12 +199,20 @@ class decision_tree(object):
         '''
         split_info = {"label": label, "left_value": value_0, "right_value": value_1,
                                       "left_ds": dataset_att0, "right_ds": dataset_att1}
-        label = [value_0, count_0, value_1, count_1]
+        label = {value_0: count_0, value_1: count_1}
         '''
-        print(node.isleaf)
-        print(node.split_info)
-        print("[" + str(node.split_info["label"][1]) + " " + node.split_info["label"][0] \
-            + "/" + str(node.split_info["label"][3]) + " " + node.split_info["label"][2] + "]")
+        # this is to ensure "/" be printed only in first iteration
+        first_iter = True
+        print("[", end = "")
+        for y_name in self.labelName:
+            if y_name in node.split_info["label"]:
+                print(str(node.split_info["label"][y_name]) + " " + y_name, end = " ")
+            else:
+                print("0 " + y_name, end = "")
+            if first_iter:
+                print(" /", end = "")
+            first_iter = False
+        print("]")
         if not node.isleaf:
             print("| " * layers + self.attriName[node.val] + " = " + node.split_info["left_value"] + ": ", end = '')
             self.print_tree(node.left, layers + 1)
