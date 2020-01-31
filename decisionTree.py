@@ -16,11 +16,6 @@ def majority_vote(dataset):
 
 def gini_impurity(dataset):
     total = len(dataset)
-    # TODO: not sure if this's correct (do I need to handle it pre?)
-    # Unmeaningful to split, so return 0
-    if total == 0:
-        return 0
-
     count_0, count_1 = 0., 0.
     value_0, value_1 = dataset[0][-1], None
 
@@ -53,6 +48,11 @@ def gini_gain(dataset, attri_idx):
             count_att1 += 1
             dataset_att1.append(data)
 
+    # TODO: Not sure is this correct
+    # Unmeaningful to split, so return 0
+    if len(dataset_att0) == 0 or len(dataset_att1) == 0:
+        return 0, None
+
     if Debug:
         print(dataset)
         print(dataset_att0)
@@ -65,7 +65,7 @@ def gini_gain(dataset, attri_idx):
     gini_y, label = gini_impurity(dataset)
     gg = gini_y - p_att0 * gini_att0 - p_att1 * gini_att1
 
-    node_info = {"label": label, "left_value": value_0, "right_vlaue": value_1, \
+    node_info = {"label": label, "left_value": value_0, "right_value": value_1, \
                                  "left_ds": dataset_att0, "right_ds": dataset_att1}
 
     return gg, node_info
@@ -86,7 +86,6 @@ class decision_tree(object):
         self.depth = 0
         self.max_depth = max_depth
         self.unused_nodes = None
-        self.isMarVote = False
         # The following attris are for printing tree
         self.attriName = None
 
@@ -107,13 +106,12 @@ class decision_tree(object):
         # len(0, 1, 2, 3, 4) = 5
         self.unused_nodes = set(range(len(dataset[0]) - 1))
         self.root = self.train_stump(dataset)
-        if self.root == None:
-            self.isMarVote = True
 
     def train_stump(self, dataset):
-        # additional stopping rules
+        # special stopping rules
+        pred = majority_vote(dataset)
         if (len(self.unused_nodes) == 0) and (self.depth >= self.max_depth):
-            return None
+            return tree_node(pred, True)
 
         gg_max, split_idx = 0, -1
         dataset_0, dataset_1 = None, None
@@ -128,8 +126,9 @@ class decision_tree(object):
             # split and create a node
             node = tree_node(split_idx)
             node.split_info = node_info
-            dataset_0, dataset_1 = node.split_info[0]["dataset"], node.split_info[1]["dataset"]
+            dataset_0, dataset_1 = node.split_info["left_ds"], node.split_info["right_ds"]
             self.depth += 1
+            self.unused_nodes.remove(split_idx)
 
             if Debug:
                 print("left chd:\n dataset: ", len(dataset_0))
@@ -151,24 +150,19 @@ class decision_tree(object):
             return node
         else:
             # touch stoping rule, no split
-            return None
+            return tree_node(pred, True)
 
     # Use decision tree to predict y for a single data line
-    # this func is used to packaging self.isMarVote
-    def prefict(self, ele):
-        if self.isMarVote:
-            return self.root
-        return self.predict_node(self.root, ele)
-
-    def predict_node(self, node, ele):
+    def predict(self, node, ele):
         if node.isleaf:
             return node.val
         elif node.split_info["left_value"] == ele[node.val]:
-            return self.predict_node(node.left, ele)
+            return self.predict(node.left, ele)
         elif node.split_info["right_value"] == ele[node.val]:
-            return self.predict_node(node.right, ele)
+            return self.predict(node.right, ele)
         else:
             print("Error! Unknown value " + ele[node.val] + "for attribute " + self.attriName[node.val])
+            exit(-1)
 
     def evaluate(self, in_path, out_path):
         error = 0
@@ -182,7 +176,7 @@ class decision_tree(object):
                         continue
                     split_line = line.strip().split('\t')
 
-                    pred = self.prefict(split_line)
+                    pred = self.predict(self.root, split_line)
                     if pred != split_line[-1]:
                         error += 1
                     f_out.write(pred + "\n")
@@ -193,16 +187,18 @@ class decision_tree(object):
     def print_tree(self, node, layers):
         # TODO
         '''
-        split_info = {"label": label, "left_value": value_0, "right_vlaue": value_1,
+        split_info = {"label": label, "left_value": value_0, "right_value": value_1,
                                       "left_ds": dataset_att0, "right_ds": dataset_att1}
         label = [value_0, count_0, value_1, count_1]
         '''
-        print("[" + node.split_info["label"][1] + " " + node.split_info["label"][0] \
-            + "/" + node.split_info["label"][3] + " " + node.split_info["label"][2] + "]")
+        print(node.isleaf)
+        print(node.split_info)
+        print("[" + str(node.split_info["label"][1]) + " " + node.split_info["label"][0] \
+            + "/" + str(node.split_info["label"][3]) + " " + node.split_info["label"][2] + "]")
         if not node.isleaf:
-            print("| " * layers + self.attriName[node.val] + " = " + node.split_info["left_value"] + ": ", end="")
+            print("| " * layers + self.attriName[node.val] + " = " + node.split_info["left_value"] + ": ", end = '')
             self.print_tree(node.left, layers + 1)
-            print("| " * layers + self.attriName[node.val] + " = " + node.split_info["right_value"] + ": ", end="")
+            print("| " * layers + self.attriName[node.val] + " = " + node.split_info["right_value"] + ": ", end = '')
             self.print_tree(node.right, layers + 1)
 
 
