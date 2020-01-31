@@ -2,7 +2,17 @@ import sys
 import math
 import numpy as np
 
-Debug = False
+Debug = True
+
+# return the y value which appears most times
+def majority_vote(dataset):
+    cnt = dict()
+    for data in dataset:
+        if data[-1] in cnt:
+            cnt[data[-1]] += 1
+        else:
+            cnt[data[-1]] = 1
+    return max(cnt, key = lambda x: cnt[x])
 
 def gini_impurity(dataset):
     total = len(dataset)
@@ -36,35 +46,32 @@ def gini_gain(dataset, attri_idx):
     gini_att0 = gini_impurity(dataset_att0)
     gini_att1 = gini_impurity(dataset_att1)
     gini_y = gini_impurity(dataset)
+    gini = gini_y - p_att0 * gini_att0 - p_att1 * gini_att1
 
-    return gini_y - p_att0 * gini_att0 - p_att1 * gini_att1
+    return gini, dataset_att0, dataset_att1
 
-# return the y value which appears most times
-def majority_vote(dataset):
-    cnt = dict()
-    for data in dataset:
-        if data[-1] in cnt:
-            cnt[data[-1]] += 1
-        else:
-            cnt[data[-1]] = 1
-    return max(cnt, key = lambda x: cnt[x])
 
 class tree_node(object):
-    def __init__(self, val):
+    def __init__(self, val, isleaf = False):
         self.left = None
         self.right = None
-        self.val = val
+        self.val = val  # store split_idx if isn't a leaf, otherwise store predicted value
+        self.isleaf = isleaf
+        self.value_left = None
+
 
 class decision_tree(object):
     def __init__(self, max_depth):
         self.root = None
         self.depth = 0
         self.max_depth = max_depth
+        self.unused_nodes = None
+        self.isMarVote = False
 
-    def train(self, train_file):
-        self.value_left = None
-        dataset_left, dataset_right = [], []
+    def build_tree(self, train_file):
+        dataset = []
 
+        # read from dataset
         with open(train_file, 'r') as f:
             idx = 0
             for line in f:
@@ -72,29 +79,71 @@ class decision_tree(object):
                     idx += 1
                     continue
                 split_line = line.strip().split('\t')
-                # set the first value met as for left child
-                if idx == 1:
-                    self.value_left = split_line[self.split_idx]
-
-                if split_line[self.split_idx] == self.value_left:
-                    dataset_left.append(split_line)
-                else:
-                    dataset_right.append(split_line)
+                dataset.append(split_line)
                 idx += 1
 
-        self.left_pred = majority_vote(dataset_left)
-        self.right_pred = majority_vote(dataset_right)
+        # len(0, 1, 2, 3, 4) = 5
+        self.unused_nodes = set(range(len(dataset[0]) - 1))
+        self.root = self.train_stump(dataset)
+        if self.root == None:
+            self.isMarVote = True
 
-        if Debug:
-            print("Trainset: ", idx - 1)
-            print("left chd:\n dataset: ", len(dataset_left), "pred: ", self.left_pred)
-            print("right chd:\n dataset: ", len(dataset_right), "pred: ", self.right_pred)
+    def train_stump(self, dataset):
+        # additional stopping rules
+        if (len(self.unused_nodes) == 0) and (self.depth >= self.max_depth):
+            return None
 
-    def prefict(self, ele):
-        if ele[self.split_idx] == self.value_left:
-            return self.left_pred
+        gg_max, split_idx = 0, -1
+        dataset_0, dataset_1 = None, None
+        for idx in self.unused_nodes:
+            gg_cur, dst_0, dst_1 = gini_gain(dataset, idx)
+            # Is there any possibility to have two identical gini from two attris?
+            if (gg_cur > gg_max):
+                gg_max = gg_cur
+                split_idx = idx
+                dataset_0, dataset_1 = dst_0, dst_1
+
+        if split_idx != -1:
+            # split and create a node
+            node = tree_node(split_idx)
+            self.depth += 1
+
+            if Debug:
+                print("left chd:\n dataset: ", len(dataset_0))
+                print("right chd:\n dataset: ", len(dataset_1))
+
+            # build sub trees
+            left_chd = self.train_stump(dataset_0)
+            if left_chd:
+                node.left = left_chd
+            else:
+                node.left = tree_node(majority_vote(dataset_0), True)
+
+            right_chd = self.train_stump(dataset_1)
+            if right_chd:
+                node.right = right_chd
+            else:
+                node.right = tree_node(majority_vote(dataset_1), True)
+
+            return node
         else:
-            return self.right_pred
+            # touch stoping rule, no split
+            return None
+
+    # Use decision tree to predict y for a single data line
+    # this func is used to packaging self.isMarVote
+    def prefict(self, ele):
+        if self.isMarVote:
+            return self.root
+        return self.predict_stump(self.root, ele)
+
+    def predict_stump(self, node, ele):
+        if node.isleaf:
+            return node.val
+        elif node.value_left == ele[node.val]:
+            return self.predict_stump(node.left, ele)
+        else:
+            return self.predict_stump(node.right, ele)
 
     def evaluate(self, in_path, out_path):
         error = 0
@@ -131,8 +180,8 @@ if __name__ == '__main__':
 
     model = decision_tree(max_depth)
 
-    # training: build the model
-    model.train(train_file)
+    # training: build the decison tree model
+    model.build_tree(train_file)
 
     # testing: evaluate and write labels to output files
     train_error = model.evaluate(train_file, train_out)
