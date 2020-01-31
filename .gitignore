@@ -1,3 +1,4 @@
 *.tsv
 *.txt
+*.labels
 example_output

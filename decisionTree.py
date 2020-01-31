@@ -16,39 +16,59 @@ def majority_vote(dataset):
 
 def gini_impurity(dataset):
     total = len(dataset)
+    # TODO: not sure if this's correct (do I need to handle it pre?)
+    # Unmeaningful to split, so return 0
+    if total == 0:
+        return 0
+
     count_0, count_1 = 0., 0.
-    value_0 = dataset[0][-1]
+    value_0, value_1 = dataset[0][-1], None
 
     for data in dataset:
         if data[-1] == value_0:
             count_0 += 1
         else:
+            if value_1 == None:
+                value_1 = data[-1]
             count_1 += 1
 
-    return 1 - (count_0 / total) ** 2 - (count_1 / total) ** 2
+    gini = 1 - (count_0 / total) ** 2 - (count_1 / total) ** 2
+    label_count = [value_0, count_0, value_1, count_1]
+
+    return gini, label_count
 
 def gini_gain(dataset, attri_idx):
     total = len(dataset)
     count_att0, count_att1 = 0, 0
     dataset_att0, dataset_att1 = [], []
-    value_0 = dataset[0][-1]
+    value_0, value_1 = dataset[0][attri_idx], None
 
     for data in dataset:
         if data[attri_idx] == value_0:
             count_att0 += 1
             dataset_att0.append(data)
         else:
+            if value_1 == None:
+                value_1 = data[attri_idx]
             count_att1 += 1
             dataset_att1.append(data)
 
+    if Debug:
+        print(dataset)
+        print(dataset_att0)
+        print(dataset_att1)
+
     p_att0 = count_att0 / total
     p_att1 = count_att1 / total
-    gini_att0 = gini_impurity(dataset_att0)
-    gini_att1 = gini_impurity(dataset_att1)
-    gini_y = gini_impurity(dataset)
-    gini = gini_y - p_att0 * gini_att0 - p_att1 * gini_att1
+    gini_att0, _ = gini_impurity(dataset_att0)
+    gini_att1, _ = gini_impurity(dataset_att1)
+    gini_y, label = gini_impurity(dataset)
+    gg = gini_y - p_att0 * gini_att0 - p_att1 * gini_att1
 
-    return gini, dataset_att0, dataset_att1
+    node_info = {"label": label, "left_value": value_0, "right_vlaue": value_1, \
+                                 "left_ds": dataset_att0, "right_ds": dataset_att1}
+
+    return gg, node_info
 
 
 class tree_node(object):
@@ -57,7 +77,7 @@ class tree_node(object):
         self.right = None
         self.val = val  # store split_idx if isn't a leaf, otherwise store predicted value
         self.isleaf = isleaf
-        self.value_left = None
+        self.split_info = None # if not a leaf, store split-related information
 
 
 class decision_tree(object):
@@ -67,6 +87,8 @@ class decision_tree(object):
         self.max_depth = max_depth
         self.unused_nodes = None
         self.isMarVote = False
+        # The following attris are for printing tree
+        self.attriName = None
 
     def build_tree(self, train_file):
         dataset = []
@@ -75,11 +97,11 @@ class decision_tree(object):
         with open(train_file, 'r') as f:
             idx = 0
             for line in f:
-                if idx == 0:
-                    idx += 1
-                    continue
                 split_line = line.strip().split('\t')
-                dataset.append(split_line)
+                if idx == 0:
+                    self.attriName = split_line
+                else:
+                    dataset.append(split_line)
                 idx += 1
 
         # len(0, 1, 2, 3, 4) = 5
@@ -96,16 +118,17 @@ class decision_tree(object):
         gg_max, split_idx = 0, -1
         dataset_0, dataset_1 = None, None
         for idx in self.unused_nodes:
-            gg_cur, dst_0, dst_1 = gini_gain(dataset, idx)
+            gg_cur, node_info = gini_gain(dataset, idx)
             # Is there any possibility to have two identical gini from two attris?
             if (gg_cur > gg_max):
                 gg_max = gg_cur
                 split_idx = idx
-                dataset_0, dataset_1 = dst_0, dst_1
 
         if split_idx != -1:
             # split and create a node
             node = tree_node(split_idx)
+            node.split_info = node_info
+            dataset_0, dataset_1 = node.split_info[0]["dataset"], node.split_info[1]["dataset"]
             self.depth += 1
 
             if Debug:
@@ -135,15 +158,17 @@ class decision_tree(object):
     def prefict(self, ele):
         if self.isMarVote:
             return self.root
-        return self.predict_stump(self.root, ele)
+        return self.predict_node(self.root, ele)
 
-    def predict_stump(self, node, ele):
+    def predict_node(self, node, ele):
         if node.isleaf:
             return node.val
-        elif node.value_left == ele[node.val]:
-            return self.predict_stump(node.left, ele)
+        elif node.split_info["left_value"] == ele[node.val]:
+            return self.predict_node(node.left, ele)
+        elif node.split_info["right_value"] == ele[node.val]:
+            return self.predict_node(node.right, ele)
         else:
-            return self.predict_stump(node.right, ele)
+            print("Error! Unknown value " + ele[node.val] + "for attribute " + self.attriName[node.val])
 
     def evaluate(self, in_path, out_path):
         error = 0
@@ -165,9 +190,20 @@ class decision_tree(object):
 
         return error / (total - 1) # len(data)
 
-    def print_tree(self):
-        print("TODO\n")
-        pass
+    def print_tree(self, node, layers):
+        # TODO
+        '''
+        split_info = {"label": label, "left_value": value_0, "right_vlaue": value_1,
+                                      "left_ds": dataset_att0, "right_ds": dataset_att1}
+        label = [value_0, count_0, value_1, count_1]
+        '''
+        print("[" + node.split_info["label"][1] + " " + node.split_info["label"][0] \
+            + "/" + node.split_info["label"][3] + " " + node.split_info["label"][2] + "]")
+        if not node.isleaf:
+            print("| " * layers + self.attriName[node.val] + " = " + node.split_info["left_value"] + ": ", end="")
+            self.print_tree(node.left, layers + 1)
+            print("| " * layers + self.attriName[node.val] + " = " + node.split_info["right_value"] + ": ", end="")
+            self.print_tree(node.right, layers + 1)
 
 
 if __name__ == '__main__':
@@ -198,4 +234,4 @@ if __name__ == '__main__':
 
     # Output: Printing the Tree
     # Note: another way is to print it during tree generation
-    model.print_tree()
+    model.print_tree(model.root, 1)
