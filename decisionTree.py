@@ -85,7 +85,6 @@ class decision_tree(object):
         self.root = None
         self.depth = 0
         self.max_depth = max_depth
-        self.unused_nodes = None
         # The following attributes are for printing tree
         self.attriName = None
         self.labelName = set()
@@ -106,20 +105,21 @@ class decision_tree(object):
                         self.labelName.add(split_line[-1])
                 idx += 1
 
-        # len(0, 1, 2, 3, 4) = 5
-        self.unused_nodes = set(range(len(dataset[0]) - 1))
-        self.root = self.train_stump(dataset)
+        # use length of first data line to generate available attributes # set
+        self.root = self.train_stump(dataset, set(range(len(dataset[0]) - 1)))
 
-    def train_stump(self, dataset):
+    def train_stump(self, dataset, available_nodes):
         # special stopping rules
         pred = majority_vote(dataset)
         _, label = gini_impurity(dataset)
-        if (len(self.unused_nodes) == 0) and (self.depth >= self.max_depth):
+        if (len(available_nodes) == 0) and (self.depth >= self.max_depth):
+            if Debug:
+                print("stoped: special rules", available_nodes, self.depth)
             return self.make_leaf(pred, label)
 
         gg_max, split_idx = 0, -1
         dataset_0, dataset_1 = None, None
-        for idx in self.unused_nodes:
+        for idx in available_nodes:
             gg_cur, node_info = gini_gain(dataset, idx)
             # Is there any possibility to have two identical gini from two attris?
             if (gg_cur > gg_max):
@@ -133,20 +133,25 @@ class decision_tree(object):
             node.split_info = split_info
             dataset_0, dataset_1 = node.split_info["left_ds"], node.split_info["right_ds"]
             self.depth += 1
-            self.unused_nodes.remove(split_idx)
+            
+            # must make a new copy in order to don't affect other sub-trees
+            unused_nodes = available_nodes.copy()
+            unused_nodes.remove(split_idx)
 
             if Debug:
                 print("left chd:\n dataset: ", len(dataset_0))
                 print("right chd:\n dataset: ", len(dataset_1))
 
             # build sub trees
-            left_chd = self.train_stump(dataset_0)
+            left_chd = self.train_stump(dataset_0, unused_nodes)
             if left_chd:
                 node.left = left_chd
             else:
                 node.left = tree_node(majority_vote(dataset_0), True)
 
-            right_chd = self.train_stump(dataset_1)
+            if Debug:
+                print("from here is the right tree")
+            right_chd = self.train_stump(dataset_1, unused_nodes)
             if right_chd:
                 node.right = right_chd
             else:
@@ -155,6 +160,8 @@ class decision_tree(object):
             return node
         else:
             # touch stoping rule, no split
+            if Debug:
+                print("stoped: regular rules")
             return self.make_leaf(pred, label)
 
     # return a new leaf with given label info (for printing)
