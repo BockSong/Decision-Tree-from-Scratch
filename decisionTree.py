@@ -83,7 +83,6 @@ class tree_node(object):
 class decision_tree(object):
     def __init__(self, max_depth):
         self.root = None
-        self.depth = 0
         self.max_depth = max_depth
         # The following attributes are for printing tree
         self.attriName = None
@@ -108,13 +107,13 @@ class decision_tree(object):
         # use length of first data line to generate available attributes # set
         self.root = self.train_stump(dataset, set(range(len(dataset[0]) - 1)))
 
-    def train_stump(self, dataset, available_nodes):
+    def train_stump(self, dataset, available_nodes, depth = 0):
         # special stopping rules
         pred = majority_vote(dataset)
         _, label = gini_impurity(dataset)
-        if (len(available_nodes) == 0) and (self.depth >= self.max_depth):
+        if (len(available_nodes) == 0) or (depth >= self.max_depth):
             if Debug:
-                print("stoped: special rules", available_nodes, self.depth)
+                print("stoped: special rules", available_nodes, depth)
             return self.make_leaf(pred, label)
 
         gg_max, split_idx = 0, -1
@@ -132,18 +131,19 @@ class decision_tree(object):
             node = tree_node(split_idx)
             node.split_info = split_info
             dataset_0, dataset_1 = node.split_info["left_ds"], node.split_info["right_ds"]
-            self.depth += 1
             
             # must make a new copy in order to don't affect other sub-trees
             unused_nodes = available_nodes.copy()
             unused_nodes.remove(split_idx)
+            next_depth = depth
+            next_depth += 1
 
             if Debug:
                 print("left chd:\n dataset: ", len(dataset_0))
                 print("right chd:\n dataset: ", len(dataset_1))
 
             # build sub trees
-            left_chd = self.train_stump(dataset_0, unused_nodes)
+            left_chd = self.train_stump(dataset_0, unused_nodes, next_depth)
             if left_chd:
                 node.left = left_chd
             else:
@@ -151,7 +151,7 @@ class decision_tree(object):
 
             if Debug:
                 print("from here is the right tree")
-            right_chd = self.train_stump(dataset_1, unused_nodes)
+            right_chd = self.train_stump(dataset_1, unused_nodes, next_depth)
             if right_chd:
                 node.right = right_chd
             else:
@@ -203,7 +203,7 @@ class decision_tree(object):
         return error / (total - 1) # len(data)
 
     def print_tree(self, node, layers):
-        # TODO: blanks doesn't match example output
+        # TODO: does blanks matters?
         '''
         split_info = {"label": label, "left_value": value_0, "right_value": value_1,
                                       "left_ds": dataset_att0, "right_ds": dataset_att1}
