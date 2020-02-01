@@ -2,3 +2,4 @@
 *.txt
 *.labels
 example_output
+__pycache__
