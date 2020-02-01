@@ -2,7 +2,7 @@ import sys
 import math
 import numpy as np
 
-Debug = True
+Debug = False
 
 # return the y value which appears most times
 def majority_vote(dataset):
@@ -125,11 +125,12 @@ class decision_tree(object):
             if (gg_cur > gg_max):
                 gg_max = gg_cur
                 split_idx = idx
+                split_info = node_info
 
         if split_idx != -1:
             # split and create a node
             node = tree_node(split_idx)
-            node.split_info = node_info
+            node.split_info = split_info
             dataset_0, dataset_1 = node.split_info["left_ds"], node.split_info["right_ds"]
             self.depth += 1
             self.unused_nodes.remove(split_idx)
@@ -195,7 +196,7 @@ class decision_tree(object):
         return error / (total - 1) # len(data)
 
     def print_tree(self, node, layers):
-        # TODO
+        # TODO: blanks doesn't match example output
         '''
         split_info = {"label": label, "left_value": value_0, "right_value": value_1,
                                       "left_ds": dataset_att0, "right_ds": dataset_att1}
