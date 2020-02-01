@@ -57,8 +57,7 @@ def gini_gain(dataset, attri_idx):
             count_att1 += 1
             dataset_att1.append(data)
 
-    # TODO: Not sure is this correct
-    # Unmeaningful to split, so return 0
+    # If one attri has constant value, then it's unmeaningful to split. Just return 0
     if len(dataset_att0) == 0 or len(dataset_att1) == 0:
         return 0, None
 
@@ -96,6 +95,7 @@ class decision_tree(object):
         # The following attributes are for printing tree
         self.attriName = None
         self.labelName = set()
+        self.dataset = None
 
     def build_tree(self, train_file):
         dataset = []
@@ -112,6 +112,8 @@ class decision_tree(object):
                     if split_line[-1] not in self.labelName:
                         self.labelName.add(split_line[-1])
                 idx += 1
+
+        self.dataset = dataset
 
         # use length of first data line to generate available attributes # set
         self.root = self.train_stump(dataset, set(range(len(dataset[0]) - 1)))
@@ -254,9 +256,8 @@ if __name__ == '__main__':
     train_error = model.evaluate(train_file, train_out)
     test_error = model.evaluate(test_file, test_out)
 
-    if Debug:
-        print("train_error: ", train_error)
-        print("test_error: ", test_error)
+    print("train_error: ", train_error)
+    print("test_error: ", test_error)
 
     # Output: Metrics File
     with open(metrics_out, 'w') as f_metrics:
