@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-Debug = True
+Debug = False
 
 def inspect(input_file):
     value_left = None

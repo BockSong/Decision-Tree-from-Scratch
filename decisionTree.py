@@ -12,6 +12,15 @@ def majority_vote(dataset):
             cnt[data[-1]] += 1
         else:
             cnt[data[-1]] = 1
+    
+    # handle tied case
+    cnt_key = []
+    for key in cnt:
+        cnt_key.append(key)
+    # sort in the reversed lexicographical order
+    cnt_key.sort(reverse=True)
+    if len(cnt_key) == 2 and cnt[cnt_key[0]] == cnt[cnt_key[1]]:
+        return cnt_key[0]
     return max(cnt, key = lambda x: cnt[x])
 
 def gini_impurity(dataset):
